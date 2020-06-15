@@ -1,55 +1,27 @@
 package main
 
 import (
-	"bytes"
+	"fmt"
+	"github.com/gorilla/mux"
+	_ "github.com/heroku/x/hmetrics/onload"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
-
-	"github.com/gin-gonic/gin"
-	_ "github.com/heroku/x/hmetrics/onload"
-	"github.com/russross/blackfriday"
 )
-
-func repeatHandler(r int) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var buffer bytes.Buffer
-		for i := 0; i < r; i++ {
-			buffer.WriteString("Hello from Go!\n")
-		}
-		c.String(http.StatusOK, buffer.String())
-	}
-}
 
 func main() {
 	port := os.Getenv("PORT")
-
 	if port == "" {
 		log.Fatal("$PORT must be set")
 	}
-
-	tStr := os.Getenv("REPEAT")
-	repeat, err := strconv.Atoi(tStr)
+	router := mux.NewRouter()
+	router.HandleFunc("/api/category/{name}", Category).Methods("GET")
+	router.HandleFunc("/api/product/{id}/", Product).Methods("GET")
+	router.HandleFunc("", HomeRoute)
+	router.HandleFunc("/", HomeRoute)
+	router.NotFoundHandler = http.HandlerFunc(UnknownRoute)
+	err := http.ListenAndServe(":"+port, router)
 	if err != nil {
-		log.Printf("Error converting $REPEAT to an int: %q - Using default\n", err)
-		repeat = 5
+		fmt.Print(err)
 	}
-
-	router := gin.New()
-	router.Use(gin.Logger())
-	router.LoadHTMLGlob("templates/*.tmpl.html")
-	router.Static("/static", "static")
-
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.tmpl.html", nil)
-	})
-
-	router.GET("/mark", func(c *gin.Context) {
-		c.String(http.StatusOK, string(blackfriday.Run([]byte("**hi!**"))))
-	})
-
-	router.GET("/repeat", repeatHandler(repeat))
-
-	router.Run(":" + port)
 }
